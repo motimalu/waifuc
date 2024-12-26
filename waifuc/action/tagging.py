@@ -104,6 +104,36 @@ class TagOverlapDropAction(ProcessAction):
         tags = drop_overlap_tags(dict(item.meta.get('tags') or {}))
         return ImageItem(item.image, {**item.meta, 'tags': tags})
 
+class DanbooruTagProcessAction(ProcessAction):
+    def __init__(self, meta_whitelist: List[str]):
+        self.meta_whitelist = set(meta_whitelist)
+
+    def process(self, item: ImageItem) -> ImageItem:
+        tags = dict(item.meta.get('tags') or {})
+        danbooru = item.meta.get('danbooru') or {}
+        if danbooru:
+            meta = danbooru.get('tag_string_meta', None) or ''
+            characters = danbooru.get('tag_string_character', None) or ''
+            copyrights = danbooru.get('tag_string_copyright', None) or ''
+            artists = danbooru.get('tag_string_artist', None) or ''
+            # Drop meta tags, sort desc whitelisted
+            for meta_tag in meta.split():
+                if meta_tag in self.meta_whitelist:
+                    tags[meta_tag] = 0
+                elif tags.get(meta_tag):
+                    del tags[meta_tag]
+            # Sort asc characters copyrights and artists
+            for character in characters.split():
+                tags[character] = 2.9
+            for copyright in copyrights.split():
+                tags[copyright] = 2.8
+            # pre-pend 'by' for artist tags
+            for artist in artists.split():
+                tags[artist] = 2.7
+                by_artist= 'by_' + artist
+                tags[by_artist] = tags[artist]
+                del tags[artist]
+        return ImageItem(item.image, {**item.meta, 'tags': tags})
 
 class TagDropAction(ProcessAction):
     def __init__(self, tags_to_drop: List[str]):
