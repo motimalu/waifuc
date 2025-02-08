@@ -127,10 +127,10 @@ class DanbooruTagProcessAction(ProcessAction):
                 tags[character] = 2.9
             for copyright in copyrights.split():
                 tags[copyright] = 2.8
-            # pre-pend 'by' for artist tags
+            # pre-pend 'artist:' for artist tags
             for artist in artists.split():
                 tags[artist] = 2.7
-                by_artist= 'by_' + artist
+                by_artist= 'artist:' + artist
                 tags[by_artist] = tags[artist]
                 del tags[artist]
         return ImageItem(item.image, {**item.meta, 'tags': tags})
