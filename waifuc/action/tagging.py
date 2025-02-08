@@ -4,6 +4,7 @@ from typing import Iterator, Union, List, Mapping, Literal
 from PIL import Image
 from imgutils.tagging import get_deepdanbooru_tags, get_wd14_tags, get_mldanbooru_tags, drop_overlap_tags, \
     is_blacklisted, remove_underline
+from imgutils.validate import anime_rating
 
 from .base import ProcessAction, BaseAction
 from ..model import ImageItem
@@ -136,6 +137,18 @@ class DanbooruTagProcessAction(ProcessAction):
                 by_artist= 'artist:' + artist
                 tags[by_artist] = tags[artist]
                 del tags[artist]
+        return ImageItem(item.image, {**item.meta, 'tags': tags})
+
+class TagNSFWOrExplicitAction(ProcessAction):
+    def process(self, item: ImageItem) -> ImageItem:
+        [rating, score] = anime_rating(item.image)
+        tags = dict(item.meta.get('tags') or {})
+        # Tag r15 as "nsfw"
+        if rating == 'r15':
+            tags["nsfw"] = score
+        # Tag r18 as "explicit"
+        if rating == 'r18':
+            tags["explicit"] = score
         return ImageItem(item.image, {**item.meta, 'tags': tags})
 
 class TagDropAction(ProcessAction):
