@@ -36,10 +36,11 @@ FilterSimilarModeTyping = Literal['all', 'group']
 
 class FilterSimilarAction(BaseAction):
     def __init__(self, mode: FilterSimilarModeTyping = 'all', threshold: float = 0.45,
-                 capacity: int = 500, rtol=5.e-2, atol=2.e-2):
+                 capacity: int = 500, rtol=5.e-2, atol=2.e-2, keep_first_n_tags: int = 5):
         self.mode = mode
         self.threshold, self.rtol, self.atol = threshold, rtol, atol
         self.capacity = capacity
+        self.keep_first_n_tags = keep_first_n_tags
         self.buckets: Dict[str, FeatureBucket] = {}
         self.global_bucket = FeatureBucket(threshold, self.capacity, rtol, atol)
 
@@ -55,6 +56,12 @@ class FilterSimilarAction(BaseAction):
             raise ValueError(f'Unknown mode for filter similar action - {self.mode!r}.')
 
     def iter(self, item: ImageItem) -> Iterator[ImageItem]:
+        all_tags = item.meta.get('tags', [])
+        protected_tags = set(all_tags[:self.keep_first_n_tags])
+        if any(tag in protected_tags for tag in all_tags):
+            yield item
+            return
+        
         image = item.image
         ratio = image.height * 1.0 / image.width
         feat = lpips_extract_feature(image)
