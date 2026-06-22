@@ -1,13 +1,16 @@
 from functools import partial
+import os
 from typing import Iterator, Union, List, Mapping, Literal
 
 from PIL import Image
 from imgutils.tagging import get_deepdanbooru_tags, get_wd14_tags, get_mldanbooru_tags, drop_overlap_tags, \
     is_blacklisted, remove_underline
 from imgutils.validate import anime_rating
-
+from imgutils.metrics import anime_dbaesthetic
 from .base import ProcessAction, BaseAction
 from ..model import ImageItem
+import json
+from pathlib import Path
 
 
 def _deepdanbooru_tagging(image: Image.Image, use_real_name: bool = False,
@@ -108,18 +111,58 @@ class TagOverlapDropAction(ProcessAction):
         tags = drop_overlap_tags(dict(item.meta.get('tags') or {}))
         return ImageItem(item.image, {**item.meta, 'tags': tags})
 
-class DanbooruTagProcessAction(ProcessAction):
-    def __init__(self, meta_whitelist: List[str]):
+class DanbooruMetaProcessAction(ProcessAction):
+    def __init__(self, meta_whitelist: List[str], output_dir: str):
         self.meta_whitelist = set(meta_whitelist)
+        self.output_dir = Path(output_dir)
+
+    def process(self, item: ImageItem) -> ImageItem:
+        danbooru = item.meta.get('danbooru') or {}
+
+        # Save Danbooru meta to _meta json
+        output_dir = '/data/0_danbooru_meta'
+        filename = item.meta['filename']
+        full_filename = os.path.join(output_dir, filename)
+        full_directory = os.path.dirname(full_filename)
+        full_metaname = os.path.join(output_dir, os.path.splitext(filename)[0] + '_meta.json')
+
+        if full_directory:
+            os.makedirs(full_directory, exist_ok=True)
+        with open(full_metaname, 'w', encoding='utf-8') as f:
+            json.dump(danbooru, f, indent=4)
+
+        return ImageItem({}, {**item.meta })
+
+class DanbooruTagProcessAction(ProcessAction):
+    def __init__(self, meta_whitelist: List[str], output_dir: str):
+        self.meta_whitelist = set(meta_whitelist)
+        self.output_dir = Path(output_dir)
 
     def process(self, item: ImageItem) -> ImageItem:
         tags = dict(item.meta.get('tags') or {})
         danbooru = item.meta.get('danbooru') or {}
+
+        # Save Danbooru meta to _meta json
+        filename = item.meta['filename']
+        full_filename = os.path.join(self.output_dir, filename)
+        full_directory = os.path.dirname(full_filename)
+        full_metaname = os.path.join(self.output_dir, os.path.splitext(filename)[0] + '_meta.json')
+
+        if full_directory:
+            os.makedirs(full_directory, exist_ok=True)
+        with open(full_metaname, 'w', encoding='utf-8') as f:
+            json.dump(danbooru, f, indent=4)
+
         if danbooru:
             meta = danbooru.get('tag_string_meta', None) or ''
             characters = danbooru.get('tag_string_character', None) or ''
             copyrights = danbooru.get('tag_string_copyright', None) or ''
             artists = danbooru.get('tag_string_artist', None) or ''
+            rating = danbooru.get('rating')
+            if rating == "e":
+                tags["explicit"] = 0
+            if rating == "q":
+                tags["nsfw"] = 0
             # Drop meta tags, sort desc whitelisted
             for meta_tag in meta.split():
                 if meta_tag in self.meta_whitelist:
@@ -131,10 +174,10 @@ class DanbooruTagProcessAction(ProcessAction):
                 tags[character] = 2.9
             for copyright in copyrights.split():
                 tags[copyright] = 2.8
-            # pre-pend 'artist:' for artist tags
+            # pre-pend '@:' for artist tags
             for artist in artists.split():
                 tags[artist] = 2.7
-                by_artist= 'artist:' + artist
+                by_artist = '@' + artist
                 tags[by_artist] = tags[artist]
                 del tags[artist]
         return ImageItem(item.image, {**item.meta, 'tags': tags})
@@ -149,6 +192,17 @@ class TagNSFWOrExplicitAction(ProcessAction):
         # Tag r18 as "explicit"
         if rating == 'r18':
             tags["explicit"] = score
+        return ImageItem(item.image, {**item.meta, 'tags': tags})
+
+QUALITY_TAGS = ["absurdres", "masterpiece", "best quality", "very aesthetic", "aesthetic", "low quality", "worst quality"]
+
+class SortQualityRatingsAction(ProcessAction):
+    def process(self, item: ImageItem) -> ImageItem:
+        tags = dict(item.meta.get('tags') or {})
+        for tag, score in tags.items():
+            for i, quality in enumerate(reversed(QUALITY_TAGS)):
+                if quality == tag:
+                    tags[quality] = i * 0.0001
         return ImageItem(item.image, {**item.meta, 'tags': tags})
 
 class TagDropAction(ProcessAction):

@@ -86,7 +86,11 @@ class LocalTISource(BaseDirectorySource):
             if os.path.exists(txt_file):
                 full_text = pathlib.Path(txt_file).read_text(encoding='utf-8')
                 words = re.split(r'\s*,\s*', full_text)
-                tags = {word: 1.0 for word in words}
+                tags = {}
+                score = 3.0000
+                step = 0.0001
+                for i, word in enumerate(words):
+                    tags[word] = score - i * step
             else:
                 tags = {}
 

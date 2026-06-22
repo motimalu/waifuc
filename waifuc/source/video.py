@@ -16,7 +16,7 @@ try:
     import av.datasets
     from av.error import InvalidDataError
 
-    _VIDEO_EXTRACT_AVAILABLE = True
+    _VIDEO_EXTRACT_AVAILABLE = False
 except (ImportError, ModuleNotFoundError):
     av = None
     _VIDEO_EXTRACT_AVAILABLE = False

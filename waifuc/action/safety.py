@@ -17,6 +17,9 @@ class SafetyAction(ProcessAction):
         image = item.image
         safe_tag, _ = safe_check(image, **self.cfg_safe_check)
         if safe_tag != 'safe':
+            print('Unsafe image detected')
+            tags = dict(item.meta.get('tags') or {})
+            tags['adversarial noise'] = 0
             image = remove_adversarial_noise(image, **self.cfg_adversarial)
 
         return ImageItem(image, item.meta)

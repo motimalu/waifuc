@@ -1,5 +1,7 @@
 from typing import List, Optional, Literal
 
+from numpy.compat import Path
+
 from imgutils.detect import detect_faces, detect_heads, detect_person
 from imgutils.validate import is_monochrome, anime_classify, anime_rating
 
@@ -104,6 +106,34 @@ class PersonRatioAction(FilterAction):
         (x0, y0, x1, y1), _, _ = detections[0]
         return abs((x1 - x0) * (y1 - y0)) >= self.ratio * (item.image.width * item.image.height)
 
+INPUT_DIR = Path("C:/data/1_collection_name3")
+existing_filenames = {p.name for p in INPUT_DIR.rglob("*.txt")}
+class ExistingDanbooruFileFilterAction(FilterAction):
+    def check(self, item: ImageItem) -> bool:
+        danbooru = item.meta.get('danbooru') or {}
+        id = danbooru.get('id')
+        output_file_name = f'danbooru_{id}.txt'
+        if output_file_name in existing_filenames:
+            return False
+        else:
+            return True
+        
+def is_blacklisted(tag: str):
+    blacklisted = ['ai-generated', 'ai-assisted']
+    return tag in blacklisted
+
+class BlacklistedTagFilterAction(FilterAction):
+    def check(self, item: ImageItem) -> ImageItem:
+        tags = dict(item.meta.get('tags') or {})
+        danbooru = item.meta.get('danbooru') or {}
+        meta = danbooru.get('tag_string_meta', None) or ''
+        for tag in tags.items():
+            if is_blacklisted(tag):
+                return False
+        for tag in meta:
+            if is_blacklisted(tag):
+                return False
+        return True
 
 class MinSizeFilterAction(FilterAction):
     def __init__(self, min_size: int):
@@ -119,3 +149,7 @@ class MinAreaFilterAction(FilterAction):
 
     def check(self, item: ImageItem) -> bool:
         return (item.image.width * item.image.height) ** 0.5 >= self.min_size
+
+class FileTypeFilterAction(FilterAction):
+    def check(self, item: ImageItem) -> bool:
+        return item.image.format != 'GIF'

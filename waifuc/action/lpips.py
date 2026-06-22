@@ -56,12 +56,6 @@ class FilterSimilarAction(BaseAction):
             raise ValueError(f'Unknown mode for filter similar action - {self.mode!r}.')
 
     def iter(self, item: ImageItem) -> Iterator[ImageItem]:
-        all_tags = item.meta.get('tags', [])
-        protected_tags = set(all_tags[:self.keep_first_n_tags])
-        if any(tag in protected_tags for tag in all_tags):
-            yield item
-            return
-        
         image = item.image
         ratio = image.height * 1.0 / image.width
         feat = lpips_extract_feature(image)
